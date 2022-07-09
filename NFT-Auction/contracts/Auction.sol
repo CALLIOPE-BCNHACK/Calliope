@@ -15,6 +15,12 @@ pragma solidity 0.8.7;
 // - Place buy order/bid --> 1inch
 // - Market buy
 
+import "../node_modules/openzeppelin/contracts/token/IERC721.sol";
+
+interface BasicNft {
+    function getTotalSupply() external;
+}
+
 error OwnershipClaimed();
 error PayamentNotEnough();
 error AuctionClosed();
@@ -27,6 +33,8 @@ contract Auction {
 
     uint256 price;
     uint256 time;
+    mapping(uint256 => address) shareOwnership;
+    uint256 shareUsage;
 
     uint256 constant INTERVAL;
 
