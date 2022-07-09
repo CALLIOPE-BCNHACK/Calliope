@@ -7,13 +7,12 @@ pragma solidity 0.8.7;
 
 // Creator settings
 // - Share of the NFT that is being sold (% revenue) --> how many of those shares are being sold?
-// - Start and end time --> Auction status Enum: pending, open, closed
-// - Initial price
+// - Start and end time --> Auction status Enum: open/closed
+// - Initial price 
 // - Price decrease interval & amount
 
 // Bidder settings
-// - Place buy order/bid --> is this public?
-// - Set alarm
+// - Place buy order/bid --> 1inch
 // - Market buy
 
 error OwnershipClaimed();
@@ -25,8 +24,12 @@ event ShareBuy (uint256 indexed _shareId, uint256 indexed _price, address indexe
 contract Auction {
     address payable immutable creator;
     address immutable nft;
+
     uint256 price;
-    mapping(uint256 => address) shareOwnership;
+    uint256 time;
+
+    uint256 constant INTERVAL;
+
 
     enum AuctionStatus {
         OPEN,
@@ -34,11 +37,18 @@ contract Auction {
     }
     AuctionStatus status;
 
-    constructor(address _nft) {
+    constructor(
+        address _nft,
+        uint256 _price,
+        uint256 _share,
+        uint256 _shareAmount,
+        uint256 _auctionDuration
+        ) {
         nft = _nft;
         price = _price;
         share = _share;
         shareAmount = _shareAmount
+        auctionDuration = _auctionDuration*3600;
         creator = msg.sender;
     }
 
@@ -56,10 +66,12 @@ contract Auction {
     }
 
     function closeAuction() external onlyOwner {
+        if (status != AuctionStatus.OPEN) revert AuctionClosed();
         status = AuctionStatus.CLOSED;
     }
 
     function openAuction() external onlyOwner {
+        if (status != AuctionStatus.CLOSED) revert AuctionClosed();
         status = AuctionStatus.OPEN;
     }
 }
