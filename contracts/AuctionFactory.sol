@@ -8,9 +8,9 @@ contract AuctionFactory is Ownable {
     bool auction;
     address auctionAddress;
 
-    function createAuction(address _eure, address _eth) external onlyOwner {
+    function createAuction(address _nft) external onlyOwner {
         if (auction) revert AuctionExists();
-        Auction newAuction = new Auction(address(this), _eure, _eth);
+        Auction newAuction = new Auction(address(this));
         auctionAddress = address(newAuction);
         auction = true;
     }
