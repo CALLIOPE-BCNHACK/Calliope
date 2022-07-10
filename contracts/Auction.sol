@@ -12,7 +12,6 @@ pragma solidity 0.8.7;
 // - Price decrease interval & amount
 
 // Bidder settings
-// - Place buy order/bid --> 1inch
 // - Market buy
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -34,9 +33,9 @@ contract Auction is KeeperCompatibleInterface, Ownable {
     AuctionStatus status;
 
     address payable creator;
-    address immutable EURe;
-    address immutable ETH;
     address immutable nftAddress;
+    address constant ETH = 0x05f52c0475Fc30eE6A320973CA463BD6e4528549;
+    address constant USDC = 0x3120f93ff440ec53c763a98ed6993fbf4118463f;
 
     uint256[2] availableNft;
     uint256 initialPrice;
@@ -46,9 +45,17 @@ contract Auction is KeeperCompatibleInterface, Ownable {
     uint256 lastTimeStamp;
     uint256 constant INTERVAL = 60;
 
+    event PriceUpdate (uint256 indexed _newPrice, uint256 _time);
+    event AuctionClosed (uint256 _time);
+    event AuctionOpened (
+        uint256 indexed _newPrice, 
+        uint256 indexed _fromId, 
+        uint256 indexed _toId, 
+        uint256 _time)
+
     constructor(
         address _nftAddress,
-        address _eureAddress,
+        address _usdcAddress,
         address _ethAddress
     ) {
         nftAddress = _nftAddress;
@@ -64,6 +71,8 @@ contract Auction is KeeperCompatibleInterface, Ownable {
         uint256 _newPrice,
         uint256 _auctionDuration
     ) external onlyOwner {
+        if (status != AuctionStatus.CLOSED) revert AuctionClosed();
+        
         availableNft = [_fromId, _toId];
 
         for (uint256 i = _fromId; i < _toId + 1; i++) {
@@ -74,8 +83,7 @@ contract Auction is KeeperCompatibleInterface, Ownable {
         price = _newPrice;
         endAuction = block.timestamp + _auctionDuration;
 
-        openAuction();
-        // EVENT
+        status = AuctionStatus.OPEN;
     }
 
     function buyNft(uint256 _nftId, address _token) public {
@@ -102,19 +110,12 @@ contract Auction is KeeperCompatibleInterface, Ownable {
         IERC721(nftAddress).safeTransferFrom(creator, msg.sender, _nftId);
     }
 
-    function placeBid(uint256 _shareId, uint256 _price) external {}
-
     function closeAuction() public onlyOwner {
         if (status != AuctionStatus.OPEN) revert AuctionClosed();
         status = AuctionStatus.CLOSED;
         // EVENT
     }
 
-    function openAuction() public onlyOwner {
-        if (status != AuctionStatus.CLOSED) revert AuctionClosed();
-        status = AuctionStatus.OPEN;
-        // EVENT
-    }
 
     function checkUpkeep(
         bytes memory /* checkData */
@@ -122,21 +123,26 @@ contract Auction is KeeperCompatibleInterface, Ownable {
         public
         override
         returns (
-            bool upkeepNeeded,
+            bool priceUpdateNeeded,
+            bool auctionCloseNeeded,
             bytes memory /* performData */
         )
     {
-        upkeepNeeded = (block.timestamp - lastTimeStamp) > INTERVAL;
+        priceUpdateNeeded = ((block.timestamp - lastTimeStamp) > INTERVAL); 
+        auctionCloseNeeded = (block.timestamp => endAuction);
     }
 
     function performUpkeep(
         bytes calldata /* performData */
     ) external override {
-        (bool upkeepNeeded, ) = checkUpkeep("");
-        if (!upkeepNeeded) {
+        (bool priceUpdateNeeded, auctionCloseNeeded,) = checkUpkeep("");
+        if (!priceUpdateNeeded && !auctionCloseNeeded) {
             revert UpkeepNotNeeded();
+        } else if (priceUpdateNeeded) {
+            price = initialPrice * 999 / 1000;
+            lastTimeStamp = block.timestamp;
+        } else if (auctionCloseNeeded){
+            closeAuction();
         }
-        price = initialPrice * 0.999;
-        lastTimeStamp = block.timestamp;
     }
 }
